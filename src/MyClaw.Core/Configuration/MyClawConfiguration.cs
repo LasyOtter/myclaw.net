@@ -313,6 +313,18 @@ public class MCPConfig
 {
     [JsonPropertyName("servers")]
     public List<string> Servers { get; set; } = new();
+
+    /// <summary>
+    /// 工具暴露允许列表（按工具名）。非空时仅暴露列表中的工具；为空表示不限制。
+    /// </summary>
+    [JsonPropertyName("allowedTools")]
+    public List<string> AllowedTools { get; set; } = new();
+
+    /// <summary>
+    /// 工具暴露拒绝列表（按工具名）。命中即拒绝，优先级高于允许列表。
+    /// </summary>
+    [JsonPropertyName("blockedTools")]
+    public List<string> BlockedTools { get; set; } = new();
 }
 
 public class AutoCompactConfig

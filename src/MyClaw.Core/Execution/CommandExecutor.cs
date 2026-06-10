@@ -49,7 +49,7 @@ public class CommandExecutor
         "tree", "du", "df", "curl", "wget"
     };
 
-    // 危险命令黑名单（双重保险）
+    // 危险命令黑名单（双重保险，按命令名精确匹配）
     private static readonly HashSet<string> BlockedCommands = new(StringComparer.OrdinalIgnoreCase)
     {
         "rm", "del", "rd", "rmdir",
@@ -58,8 +58,16 @@ public class CommandExecutor
         "mv", "move",
         "dd", "mkfs", "fdisk", "format",
         "shutdown", "reboot", "halt",
-        "kill", "pkill", "killall",
-        ">:", ">>", "|", "&", ";"
+        "kill", "pkill", "killall"
+    };
+
+    // 危险 shell 元字符/模式：命令替换、管道、重定向、链式执行、后台执行、换行
+    private static readonly string[] DangerousShellPatterns =
+    {
+        "$(", "${", "`",          // 命令/变量替换
+        "|", "&", ";",            // 管道 / 后台 / 链式
+        ">", "<",                 // 重定向（含 >>、2> 等）
+        "\n", "\r"                // 多行注入
     };
 
     /// <summary>
@@ -150,41 +158,47 @@ public class CommandExecutor
     }
 
     /// <summary>
-    /// 验证命令安全性
+    /// 验证命令安全性。
+    ///
+    /// 先按字符检测危险的 shell 元字符（命令替换 <c>$()</c>/反引号、管道、重定向、
+    /// 链式执行、换行），再按 <em>命令名 token</em>（而非子串）匹配黑/白名单，
+    /// 从而既不会误杀含 "rm"/"dd" 等子串的合法命令（如 <c>grep firmware</c>、
+    /// <c>cat addr.txt</c>），也不会漏掉 <c>$(...)</c>/反引号/单向重定向等注入。
     /// </summary>
-    private (bool IsValid, string ErrorMessage) ValidateCommand(string command)
+    internal (bool IsValid, string ErrorMessage) ValidateCommand(string command)
     {
         if (string.IsNullOrWhiteSpace(command))
         {
             return (false, "命令为空");
         }
 
-        // 提取第一个token（主命令）
+        // 1. 危险 shell 元字符检测（按字符/模式，杜绝命令替换、管道、重定向、链式执行）
+        foreach (var pattern in DangerousShellPatterns)
+        {
+            if (command.Contains(pattern, StringComparison.Ordinal))
+            {
+                var shown = pattern.Replace("\n", "\\n").Replace("\r", "\\r");
+                return (false, $"命令包含危险的 shell 元字符/模式: '{shown}'");
+            }
+        }
+
+        // 2. 解析主命令名（剥离路径），按 token 精确匹配，避免子串误杀
         var firstToken = command.Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries)
             .FirstOrDefault() ?? string.Empty;
+        var cmdName = (firstToken.Contains('/') || firstToken.Contains('\\'))
+            ? Path.GetFileName(firstToken)
+            : firstToken;
 
-        // 检查是否包含路径
-        if (firstToken.Contains('/') || firstToken.Contains('\\'))
+        // 3. 黑名单（精确匹配命令名）
+        if (BlockedCommands.Contains(cmdName))
         {
-            // 提取命令名
-            var cmdName = Path.GetFileName(firstToken);
-            if (!AllowedCommands.Contains(cmdName))
-            {
-                return (false, $"命令 '{cmdName}' 不在允许的白名单中");
-            }
-        }
-        else
-        {
-            if (!AllowedCommands.Contains(firstToken))
-            {
-                return (false, $"命令 '{firstToken}' 不在允许的白名单中");
-            }
+            return (false, $"命令 '{cmdName}' 在危险命令黑名单中");
         }
 
-        // 检查危险字符
-        if (BlockedCommands.Any(bc => command.Contains(bc)))
+        // 4. 白名单
+        if (!AllowedCommands.Contains(cmdName))
         {
-            return (false, "命令包含潜在危险字符/模式");
+            return (false, $"命令 '{cmdName}' 不在允许的白名单中");
         }
 
         return (true, string.Empty);
