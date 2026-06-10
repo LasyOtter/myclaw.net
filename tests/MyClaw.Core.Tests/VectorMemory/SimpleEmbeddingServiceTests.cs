@@ -167,6 +167,60 @@ public class SimpleEmbeddingServiceTests
         await service.EmbedAsync("Test");
     }
 
+    [Fact]
+    public async Task EmbedAsync_ShouldReturnCachedInstanceForSameText()
+    {
+        var service = new SimpleEmbeddingService(128);
+
+        var first = await service.EmbedAsync("repeat me");
+        var second = await service.EmbedAsync("repeat me");
+
+        // 命中缓存应返回同一引用（以文本为键）
+        Assert.Same(first, second);
+    }
+
+    [Fact]
+    public async Task EmbedAsync_DistinctTextsShouldNotShareCacheEntry()
+    {
+        var service = new SimpleEmbeddingService(64);
+
+        var a = await service.EmbedAsync("alpha one two three");
+        var b = await service.EmbedAsync("totally different content here");
+
+        // 不同文本绝不能因哈希碰撞而拿到同一缓存数组
+        Assert.NotSame(a, b);
+    }
+
+    [Fact]
+    public async Task EmbedAsync_IsThreadSafeUnderConcurrentAccess()
+    {
+        var service = new SimpleEmbeddingService(128);
+
+        // 单一基准，用于校验并发返回的嵌入与串行计算一致
+        var expected = await service.EmbedAsync("shared key");
+
+        var exceptions = new System.Collections.Concurrent.ConcurrentBag<Exception>();
+        var mismatches = 0;
+
+        await Task.WhenAll(Enumerable.Range(0, 64).Select(i => Task.Run(async () =>
+        {
+            try
+            {
+                // 混合命中同一键与各自不同的键，制造并发读写
+                var shared = await service.EmbedAsync("shared key");
+                if (!shared.SequenceEqual(expected)) Interlocked.Increment(ref mismatches);
+                await service.EmbedAsync($"unique-{i}");
+            }
+            catch (Exception ex)
+            {
+                exceptions.Add(ex);
+            }
+        })));
+
+        Assert.Empty(exceptions);
+        Assert.Equal(0, mismatches);
+    }
+
     private static double CosineSimilarity(float[] v1, float[] v2)
     {
         double dotProduct = 0;
