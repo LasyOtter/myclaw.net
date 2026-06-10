@@ -394,4 +394,61 @@ public class InMemoryVectorStoreTests
         Assert.Equal("high", results[0].Entry.Id);
         Assert.True(results[0].Score > results[1].Score);
     }
+
+    // 参考实现：完整余弦公式（含双边模长），用于验证点积优化在归一化向量上的等价性
+    private static double ReferenceCosine(float[] a, float[] b)
+    {
+        double dot = 0, m1 = 0, m2 = 0;
+        for (int i = 0; i < a.Length; i++)
+        {
+            dot += a[i] * b[i];
+            m1 += a[i] * a[i];
+            m2 += b[i] * b[i];
+        }
+        m1 = Math.Sqrt(m1);
+        m2 = Math.Sqrt(m2);
+        if (m1 == 0 || m2 == 0) return 0;
+        return dot / (m1 * m2);
+    }
+
+    [Fact]
+    public async Task SearchAsync_DotProductMatchesFullCosine_ForNormalizedVectors()
+    {
+        // 用真实嵌入服务（输出已 L2 归一化）构造向量库，验证“点积 == 完整余弦”
+        var embedding = new SimpleEmbeddingService(128);
+        var store = new InMemoryVectorStore(128);
+
+        var corpus = new[]
+        {
+            "the quick brown fox jumps over the lazy dog",
+            "machine learning models embed text into vectors",
+            "数字生命体拥有灵魂与记忆",
+            "completely unrelated content about cooking pasta"
+        };
+        var vectors = new Dictionary<string, float[]>();
+        foreach (var (text, idx) in corpus.Select((t, i) => (t, i)))
+        {
+            var vec = await embedding.EmbedAsync(text);
+            vectors[$"e{idx}"] = vec;
+            await store.UpsertAsync(new VectorMemoryEntry { Id = $"e{idx}", Content = text, Embedding = vec });
+        }
+
+        var query = await embedding.EmbedAsync("machine learning text embeddings");
+
+        var results = await store.SearchAsync(new VectorSearchRequest
+        {
+            QueryVector = query,
+            TopK = 10,
+            MinScore = -1.0
+        });
+
+        Assert.Equal(corpus.Length, results.Count);
+        foreach (var r in results)
+        {
+            var expected = ReferenceCosine(query, vectors[r.Entry.Id]);
+            // 归一化向量上，优化后的点积应与完整余弦公式在浮点误差内一致
+            Assert.True(Math.Abs(expected - r.Score) < 1e-5,
+                $"score mismatch for {r.Entry.Id}: dot={r.Score}, cosine={expected}");
+        }
+    }
 }
