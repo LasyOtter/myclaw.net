@@ -170,10 +170,10 @@ public class McpServer : IDisposable
             {
                 "initialize" => HandleInitialize(request.Params),
                 "notifications/initialized" => HandleInitialized(),
-                "tools/list" => HandleListTools(),
+                "tools/list" => await HandleListToolsAsync(),
                 "tools/call" => await HandleCallToolAsync(request.Params, ct),
                 "resources/list" => HandleListResources(),
-                "resources/read" => HandleReadResource(request.Params),
+                "resources/read" => await HandleReadResourceAsync(request.Params),
                 "resources/templates/list" => HandleListResourceTemplates(),
                 "prompts/list" => HandleListPrompts(),
                 "prompts/get" => HandleGetPrompt(request.Params),
@@ -242,11 +242,11 @@ public class McpServer : IDisposable
         return null; // Notification, no response
     }
 
-    private object HandleListTools()
+    private async Task<object> HandleListToolsAsync()
     {
         var tools = new List<object>();
 
-        var mcpTools = _ribosomeLoader.GetMcpToolsAsync().GetAwaiter().GetResult();
+        var mcpTools = await _ribosomeLoader.GetMcpToolsAsync();
         foreach (var tool in mcpTools)
         {
             tools.Add(new
@@ -318,9 +318,9 @@ public class McpServer : IDisposable
                 "myclaw_archive" => ToolArchive(),
                 "myclaw_entity" => await ToolEntityAsync(args),
                 "myclaw_exec" => await ToolExecAsync(args),
-                "myclaw_status" => ToolStatus(),
+                "myclaw_status" => await ToolStatusAsync(),
                 "myclaw_skill" => await ToolSkillManagerAsync(args),
-                "myclaw_introspect" => ToolIntrospect(args),
+                "myclaw_introspect" => await ToolIntrospectAsync(args),
                 "myclaw_dream" => await ToolDreamAsync(),
                 "myclaw_immune" => ToolImmune(),
                 "myclaw_heal" => ToolHeal(),
@@ -627,12 +627,12 @@ public class McpServer : IDisposable
         return await _dailyBriefingService.GenerateBriefingAsync();
     }
 
-    private string ToolStatus()
+    private async Task<string> ToolStatusAsync()
     {
         try
         {
             var evaluation = _memoryStore.EvaluateDistillation();
-            var entityCount = _entityStore.GetCountAsync().GetAwaiter().GetResult();
+            var entityCount = await _entityStore.GetCountAsync();
             var archivedCount = _memoryStore.GetArchivedCount();
 
             return $"""
@@ -837,12 +837,13 @@ public class McpServer : IDisposable
         };
     }
 
-    private string ToolIntrospect(Dictionary<string, object> args)
+    private async Task<string> ToolIntrospectAsync(Dictionary<string, object> args)
     {
         var scope = args.TryGetValue("scope", out var s) ? s.ToString() : "summary";
-        var entityCount = _entityStore.GetCountAsync().GetAwaiter().GetResult();
+        var entityCount = await _entityStore.GetCountAsync();
         var archivedCount = _memoryStore.GetArchivedCount();
         var skillCount = _skillManager.LoadedSkills.Count;
+        var toolNames = await _ribosomeLoader.GetToolNamesAsync();
 
         return scope switch
         {
@@ -858,7 +859,7 @@ public class McpServer : IDisposable
                 ## Tool Usage Analysis
 
                 Available tools from RIBOSOME:
-                {string.Join("\n", _ribosomeLoader.GetToolNamesAsync().GetAwaiter().GetResult().Select(t => $"- {t}"))}
+                {string.Join("\n", toolNames.Select(t => $"- {t}"))}
 
                 Skills: {skillCount}
                 """,
@@ -1171,7 +1172,7 @@ public class McpServer : IDisposable
         return new { resources };
     }
 
-    private object HandleReadResource(JsonElement? Params)
+    private async Task<object> HandleReadResourceAsync(JsonElement? Params)
     {
         if (Params == null || !Params.Value.TryGetProperty("uri", out var uriEl))
         {
@@ -1182,7 +1183,7 @@ public class McpServer : IDisposable
         string content;
         if (uri == "myclaw://briefing")
         {
-            content = _dailyBriefingService.GenerateBriefingAsync().GetAwaiter().GetResult();
+            content = await _dailyBriefingService.GenerateBriefingAsync();
         }
         else
         {
@@ -1190,7 +1191,7 @@ public class McpServer : IDisposable
             {
                 "myclaw://context" => ToolRead(new Dictionary<string, object>()),
                 "myclaw://skills" => string.Join("\n", _skillManager.LoadedSkills.Select(s => $"- {s.Name}: {s.Description}")),
-                "myclaw://status" => ToolStatus(),
+                "myclaw://status" => await ToolStatusAsync(),
                 _ => "Unknown resource"
             };
         }
