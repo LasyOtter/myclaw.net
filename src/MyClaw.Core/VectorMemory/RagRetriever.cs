@@ -68,7 +68,7 @@ public class RagRetriever
 
         // 2. 向量搜索
         var searchSw = System.Diagnostics.Stopwatch.StartNew();
-        var searchResults = SearchWithVector(queryVector, topK, minScore);
+        var searchResults = await SearchWithVectorAsync(queryVector, topK, minScore);
         searchSw.Stop();
         result.SearchMs = searchSw.ElapsedMilliseconds;
 
@@ -94,7 +94,7 @@ public class RagRetriever
     /// <summary>
     /// 使用预计算的向量进行搜索
     /// </summary>
-    private List<VectorSearchResult> SearchWithVector(float[] queryVector, int topK, double minScore)
+    private async Task<List<VectorSearchResult>> SearchWithVectorAsync(float[] queryVector, int topK, double minScore)
     {
         if (_vectorStore is InMemoryVectorStore memoryStore)
         {
@@ -109,7 +109,7 @@ public class RagRetriever
             MinScore = minScore
         };
 
-        return _vectorStore.SearchAsync(request).GetAwaiter().GetResult();
+        return await _vectorStore.SearchAsync(request);
     }
 
     /// <summary>

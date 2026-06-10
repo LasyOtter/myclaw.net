@@ -38,13 +38,15 @@ public class CronService
         // 启动调度器
         await _scheduler.Start(ct);
 
-        // 注册所有启用的 cron 类型任务
+        // 注册所有启用的 cron 类型任务（在锁外 await，避免锁内同步等待异步）
+        List<CronJob> cronJobs;
         lock (_lock)
         {
-            foreach (var job in _jobs.Where(j => j.Enabled && j.Schedule.Kind == "cron"))
-            {
-                RegisterCronJob(job).Wait();
-            }
+            cronJobs = _jobs.Where(j => j.Enabled && j.Schedule.Kind == "cron").ToList();
+        }
+        foreach (var job in cronJobs)
+        {
+            await RegisterCronJob(job);
         }
 
         Console.WriteLine($"[cron] 已启动，共 {_jobs.Count} 个任务");
@@ -88,6 +90,7 @@ public class CronService
     /// </summary>
     public async Task<bool> RemoveJobAsync(string id)
     {
+        IJobDetail? toDelete = null;
         lock (_lock)
         {
             var job = _jobs.FirstOrDefault(j => j.Id == id);
@@ -95,12 +98,17 @@ public class CronService
 
             _jobs.Remove(job);
 
-            // 从调度器移除
+            // 记录待移除的 jobDetail，实际删除放到锁外 await
             if (_jobDetails.TryGetValue(id, out var jobDetail))
             {
-                _scheduler.DeleteJob(jobDetail.Key).Wait();
+                toDelete = jobDetail;
                 _jobDetails.Remove(id);
             }
+        }
+
+        if (toDelete != null)
+        {
+            await _scheduler.DeleteJob(toDelete.Key);
         }
 
         await SaveAsync();
