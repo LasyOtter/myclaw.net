@@ -89,6 +89,25 @@
         "required": []
       }
     },
+    "myclaw_recall": {
+      "handler": "Recall",
+      "description": "【本能：跨会话记忆召回 (Cross-session Recall)】\n跨「长期记忆 MEMORY.md + 每日日志 + 归档日志」检索与查询最相关的历史记忆。\n优先语义检索，无命中时回退关键词匹配。\n\n## 何时调用\n1. 用户问\"我们之前聊过/讨论过……吗\"\n2. 用户问\"上次关于 X 说了什么\"\n3. 需要回忆今天之外（历史/归档）的事实或决定\n4. myclaw_read 只能看到今日+MEMORY.md，要翻更早的记忆时用本工具",
+      "isCore": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "自然语言查询，描述你想回忆的主题/事件"
+          },
+          "topK": {
+            "type": "integer",
+            "description": "返回条数上限，默认 5"
+          }
+        },
+        "required": ["query"]
+      }
+    },
     "myclaw_exec": {
       "handler": "Exec",
       "description": "【本能：感官与手 (Senses & Hands)】\n这是你在物理世界（操作系统）的唯一感知和行动方式。\n\n## 拒绝幻想 (No Hallucinations)：\n在回答前需要调查时，必须用此工具探测。\n- 确认文件内容 -> 使用 `cat`\n- 查看当前目录 -> 使用 `ls`\n- 搜索项目代码 -> 使用 `grep`\n\n## 安全警告：\n禁止危险的删除、系统配置更改等销毁操作，除非明确获得用户指令。",
