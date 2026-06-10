@@ -54,4 +54,20 @@ public interface IVectorStore
     /// 从文件加载
     /// </summary>
     Task LoadAsync(string path);
+
+    /// <summary>
+    /// 已加载文件中记录的嵌入算法版本（无文件/旧格式未记录时为 0）。
+    /// 用于启动时判定是否需要重嵌入迁移。
+    /// </summary>
+    int LoadedEmbeddingVersion { get; }
+
+    /// <summary>
+    /// 写盘时记录的嵌入算法版本，由管理器设置为当前嵌入服务的版本。
+    /// </summary>
+    int EmbeddingVersion { get; set; }
+
+    /// <summary>
+    /// 枚举全部条目（用于迁移/调试）。
+    /// </summary>
+    IEnumerable<VectorMemoryEntry> GetAllEntries();
 }

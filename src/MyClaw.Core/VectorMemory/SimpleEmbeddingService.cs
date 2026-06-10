@@ -1,4 +1,3 @@
-using System.Security.Cryptography;
 using System.Text;
 
 namespace MyClaw.Core.VectorMemory;
@@ -9,11 +8,20 @@ namespace MyClaw.Core.VectorMemory;
 /// </summary>
 public class SimpleEmbeddingService : IEmbeddingService
 {
+    /// <summary>
+    /// 当前嵌入算法版本。改动特征哈希算法（影响嵌入结果）时必须递增，
+    /// 以触发向量库的启动自动重嵌入迁移。
+    /// v1 = SHA256 截断哈希；v2 = FNV-1a 哈希。
+    /// </summary>
+    public const int CurrentEmbeddingVersion = 2;
+
     private readonly int _dimension;
     private readonly HashSet<string> _vocabulary = new();
     private readonly Dictionary<string, float[]> _embeddingCache = new();
 
     public int Dimension => _dimension;
+
+    public int EmbeddingVersion => CurrentEmbeddingVersion;
 
     public SimpleEmbeddingService(int dimension = 384)
     {
@@ -188,13 +196,23 @@ public class SimpleEmbeddingService : IEmbeddingService
     }
 
     /// <summary>
-    /// 计算字符串哈希
+    /// 计算字符串哈希（FNV-1a 64 位）。
+    /// 仅用于特征分桶，无需密码学强度；相比 SHA256 免去摘要分配，快数量级。
     /// </summary>
-    private long ComputeHash(string input)
+    private static long ComputeHash(string input)
     {
-        // 使用 SHA256 的前 8 字节作为哈希值
-        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(input));
-        return BitConverter.ToInt64(bytes, 0);
+        const ulong fnvOffsetBasis = 14695981039346656037UL;
+        const ulong fnvPrime = 1099511628211UL;
+
+        var hash = fnvOffsetBasis;
+        var bytes = Encoding.UTF8.GetBytes(input);
+        foreach (var b in bytes)
+        {
+            hash ^= b;
+            hash *= fnvPrime;
+        }
+
+        return unchecked((long)hash);
     }
 
     /// <summary>

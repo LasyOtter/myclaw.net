@@ -70,6 +70,53 @@ public class VectorMemoryManager
             var oldPath = Path.Combine(_workspace, "memory", "vectors.json");
             await _retriever.VectorStore.LoadAsync(oldPath);
         }
+
+        await MigrateEmbeddingsIfNeededAsync();
+    }
+
+    /// <summary>
+    /// 嵌入算法升级时，自动重嵌入已持久化的向量。
+    /// 当加载文件记录的嵌入版本与当前嵌入服务版本不一致时，
+    /// 用各条目原文 (Content) 重新计算向量并写回，避免新旧嵌入空间混用导致检索失真。
+    /// </summary>
+    private async Task MigrateEmbeddingsIfNeededAsync()
+    {
+        var store = _retriever.VectorStore;
+        var currentVersion = _retriever.EmbeddingService.EmbeddingVersion;
+
+        // 标记后续写盘使用当前嵌入版本
+        store.EmbeddingVersion = currentVersion;
+
+        // 版本一致则无需迁移（空库或全新文件同样跳过）
+        if (store.LoadedEmbeddingVersion == currentVersion)
+        {
+            return;
+        }
+
+        var entries = store.GetAllEntries().ToList();
+        if (entries.Count == 0)
+        {
+            // 空库：仅记录当前版本，下次写盘即为最新
+            return;
+        }
+
+        var migrated = 0;
+        foreach (var entry in entries)
+        {
+            if (string.IsNullOrWhiteSpace(entry.Content))
+            {
+                continue;
+            }
+
+            entry.Embedding = await _retriever.EmbeddingService.EmbedAsync(entry.Content);
+            await store.UpsertAsync(entry);
+            migrated++;
+        }
+
+        await SaveAsync();
+
+        Console.Error.WriteLine(
+            $"[vector-memory] 嵌入算法升级 v{store.LoadedEmbeddingVersion}->v{currentVersion}，已重嵌入 {migrated}/{entries.Count} 条目");
     }
 
     /// <summary>

@@ -108,6 +108,28 @@ public class SimpleEmbeddingServiceTests
     }
 
     [Fact]
+    public void EmbeddingVersion_ShouldBeCurrent()
+    {
+        var service = new SimpleEmbeddingService(128);
+
+        Assert.Equal(SimpleEmbeddingService.CurrentEmbeddingVersion, service.EmbeddingVersion);
+        Assert.Equal(2, service.EmbeddingVersion);
+    }
+
+    [Fact]
+    public async Task EmbedAsync_ShouldBeDeterministicAcrossInstances()
+    {
+        // FNV 哈希为纯函数：不同实例（无共享缓存）对同一文本应得到完全相同的向量
+        var serviceA = new SimpleEmbeddingService(128);
+        var serviceB = new SimpleEmbeddingService(128);
+
+        var a = await serviceA.EmbedAsync("数字生命体拥有灵魂与记忆 with mixed 文字 and code()");
+        var b = await serviceB.EmbedAsync("数字生命体拥有灵魂与记忆 with mixed 文字 and code()");
+
+        Assert.Equal(a, b);
+    }
+
+    [Fact]
     public async Task EmbedBatchAsync_ShouldReturnMultipleEmbeddings()
     {
         var service = new SimpleEmbeddingService(128);
