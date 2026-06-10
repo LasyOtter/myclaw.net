@@ -14,6 +14,7 @@ using MyClaw.Core.Logging;
 using MyClaw.Core.Memory;
 using MyClaw.Core.Mycelium;
 using MyClaw.Core.Ribosome;
+using MyClaw.Core.Tools;
 using MyClaw.Skills;
 
 namespace MyClaw.MCP;
@@ -43,6 +44,7 @@ public class McpServer : IDisposable
     private ToolUsageTracker _toolUsageTracker = null!;
     private DailyBriefingService _dailyBriefingService = null!;
     private MyceliumNetwork _myceliumNetwork = null!;
+    private ToolExposureFilter _toolFilter = null!;
     private string _workspace = null!;
 
     // Protocol state
@@ -84,6 +86,13 @@ public class McpServer : IDisposable
         var statisticsReporter = new StatisticsReporter(_analyticsService, _toolUsageTracker);
         _dailyBriefingService = new DailyBriefingService(_memoryStore, _analyticsService, _entityStore, statisticsReporter, _toolUsageTracker);
         _myceliumNetwork = new MyceliumNetwork(_workspace);
+
+        var cfg = ConfigurationLoader.Load();
+        _toolFilter = new ToolExposureFilter(cfg.MCP.AllowedTools, cfg.MCP.BlockedTools);
+        if (!_toolFilter.IsUnrestricted)
+        {
+            Log.Info($"[MCP] Tool exposure filter active (allow: {cfg.MCP.AllowedTools.Count}, block: {cfg.MCP.BlockedTools.Count})");
+        }
 
         await _entityStore.LoadAsync();
 
@@ -249,6 +258,7 @@ public class McpServer : IDisposable
         var mcpTools = _ribosomeLoader.GetMcpToolsAsync().GetAwaiter().GetResult();
         foreach (var tool in mcpTools)
         {
+            if (!_toolFilter.IsAllowed(tool.Name)) continue;
             tools.Add(new
             {
                 name = tool.Name,
@@ -259,20 +269,25 @@ public class McpServer : IDisposable
 
         foreach (var skill in _skillManager.LoadedSkills)
         {
+            var skillToolName = $"skill_{skill.Name}";
+            if (!_toolFilter.IsAllowed(skillToolName)) continue;
             tools.Add(new
             {
-                name = $"skill_{skill.Name}",
+                name = skillToolName,
                 description = $"[Skill: {skill.Name}] {skill.Description}",
                 inputSchema = new { type = "object", description = "Skill input" }
             });
         }
 
-        tools.Add(new
+        if (_toolFilter.IsAllowed("myclaw_briefing"))
         {
-            name = "myclaw_briefing",
-            description = "Generate daily briefing: tool usage, memories, entities, todo reminders, and suggestions.",
-            inputSchema = new { type = "object", properties = new { }, description = "No parameters required" }
-        });
+            tools.Add(new
+            {
+                name = "myclaw_briefing",
+                description = "Generate daily briefing: tool usage, memories, entities, todo reminders, and suggestions.",
+                inputSchema = new { type = "object", properties = new { }, description = "No parameters required" }
+            });
+        }
 
         return new { tools };
     }
@@ -285,6 +300,12 @@ public class McpServer : IDisposable
         }
 
         var name = nameEl.GetString() ?? "";
+
+        if (!_toolFilter.IsAllowed(name))
+        {
+            return new { isError = true, content = new[] { new { type = "text", text = $"Tool '{name}' is not exposed by this server (blocked by tool exposure policy)." } } };
+        }
+
         Dictionary<string, object>? args = null;
 
         if (Params.Value.TryGetProperty("arguments", out var argsEl))
