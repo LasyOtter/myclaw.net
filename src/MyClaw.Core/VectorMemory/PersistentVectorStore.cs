@@ -24,6 +24,16 @@ public class PersistentVectorStore : IVectorStore, IDisposable
     public int Count => _entries.Count;
 
     /// <summary>
+    /// 已加载文件记录的嵌入算法版本（无文件/旧格式未记录时为 0）。
+    /// </summary>
+    public int LoadedEmbeddingVersion { get; private set; }
+
+    /// <summary>
+    /// 写盘时记录的嵌入算法版本。
+    /// </summary>
+    public int EmbeddingVersion { get; set; }
+
+    /// <summary>
     /// 存储统计信息
     /// </summary>
     public PersistentStoreStats Stats
@@ -226,7 +236,8 @@ public class PersistentVectorStore : IVectorStore, IDisposable
                 // 序列化数据
                 var data = new VectorStoreData
                 {
-                    Version = 1,
+                    Version = 2,
+                    EmbeddingVersion = EmbeddingVersion,
                     Dimension = _dimension,
                     SavedAt = DateTime.UtcNow,
                     Entries = _entries.Values.ToList()
@@ -341,9 +352,10 @@ public class PersistentVectorStore : IVectorStore, IDisposable
                 }
             }
 
+            LoadedEmbeddingVersion = data.EmbeddingVersion;
             _lastSaveTime = DateTime.UtcNow;
 
-            Console.Error.WriteLine($"[vector-memory] Loaded {data.Entries.Count} entries (dimension: {data.Dimension})");
+            Console.Error.WriteLine($"[vector-memory] Loaded {data.Entries.Count} entries (dimension: {data.Dimension}, embeddingVersion: {data.EmbeddingVersion})");
         }
         catch (Exception ex)
         {
@@ -500,6 +512,12 @@ public class PersistentVectorStore : IVectorStore, IDisposable
 public class VectorStoreData
 {
     public int Version { get; set; }
+
+    /// <summary>
+    /// 嵌入算法版本（旧文件未记录时反序列化为 0）。
+    /// </summary>
+    public int EmbeddingVersion { get; set; }
+
     public int Dimension { get; set; }
     public DateTime SavedAt { get; set; }
     public List<VectorMemoryEntry> Entries { get; set; } = new();

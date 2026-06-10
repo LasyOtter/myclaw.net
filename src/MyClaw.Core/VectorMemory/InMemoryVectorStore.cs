@@ -18,6 +18,16 @@ public class InMemoryVectorStore : IVectorStore
     public int Dimension => _dimension;
     public int Count => _entries.Count;
 
+    /// <summary>
+    /// 已加载文件记录的嵌入算法版本（无文件/旧格式未记录时为 0）。
+    /// </summary>
+    public int LoadedEmbeddingVersion { get; private set; }
+
+    /// <summary>
+    /// 写盘时记录的嵌入算法版本。
+    /// </summary>
+    public int EmbeddingVersion { get; set; }
+
     public InMemoryVectorStore(int dimension = 384)
     {
         _dimension = dimension;
@@ -204,7 +214,16 @@ public class InMemoryVectorStore : IVectorStore
             entriesCopy = _entries.Values.ToList();
         }
 
-        var json = JsonSerializer.Serialize(entriesCopy, new JsonSerializerOptions
+        var data = new VectorStoreData
+        {
+            Version = 2,
+            EmbeddingVersion = EmbeddingVersion,
+            Dimension = _dimension,
+            SavedAt = DateTime.UtcNow,
+            Entries = entriesCopy
+        };
+
+        var json = JsonSerializer.Serialize(data, new JsonSerializerOptions
         {
             WriteIndented = true
         });
@@ -217,7 +236,22 @@ public class InMemoryVectorStore : IVectorStore
         if (!File.Exists(path)) return;
 
         var json = await File.ReadAllTextAsync(path);
-        var entries = JsonSerializer.Deserialize<List<VectorMemoryEntry>>(json);
+
+        // 兼容两种格式：新版 VectorStoreData 包装对象，或旧版纯条目数组。
+        List<VectorMemoryEntry>? entries;
+        int loadedEmbeddingVersion = 0;
+        var trimmed = json.TrimStart();
+        if (trimmed.StartsWith('['))
+        {
+            // 旧格式：纯 List<VectorMemoryEntry>，未记录嵌入版本（视为 0）
+            entries = JsonSerializer.Deserialize<List<VectorMemoryEntry>>(json);
+        }
+        else
+        {
+            var data = JsonSerializer.Deserialize<VectorStoreData>(json);
+            entries = data?.Entries;
+            loadedEmbeddingVersion = data?.EmbeddingVersion ?? 0;
+        }
 
         if (entries != null)
         {
@@ -233,6 +267,8 @@ public class InMemoryVectorStore : IVectorStore
                 }
             }
         }
+
+        LoadedEmbeddingVersion = loadedEmbeddingVersion;
     }
 
     /// <summary>

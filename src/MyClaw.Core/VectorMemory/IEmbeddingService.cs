@@ -11,6 +11,11 @@ public interface IEmbeddingService
     int Dimension { get; }
 
     /// <summary>
+    /// 嵌入算法版本。改动算法（影响嵌入结果）时递增，用于向量库迁移判定。
+    /// </summary>
+    int EmbeddingVersion { get; }
+
+    /// <summary>
     /// 生成文本嵌入向量
     /// </summary>
     Task<float[]> EmbedAsync(string text);
