@@ -34,6 +34,7 @@ public class McpServer : IDisposable
     private Task? _readLoopTask;
 
     private MemoryStore _memoryStore = null!;
+    private MemoryRecallService _memoryRecall = null!;
     private EntityStore _entityStore = null!;
     private SkillManager _skillManager = null!;
     private CommandExecutor _commandExecutor = null!;
@@ -65,6 +66,7 @@ public class McpServer : IDisposable
         Directory.CreateDirectory(_workspace);
 
         _memoryStore = new MemoryStore(_workspace);
+        _memoryRecall = new MemoryRecallService(_workspace);
         _entityStore = new EntityStore(_workspace);
         _skillManager = new SkillManager(SkillPaths.ResolveSkillsDirectory(_workspace));
         _skillManager.LoadSkills();
@@ -315,6 +317,7 @@ public class McpServer : IDisposable
                 "myclaw_reproduce" => await ToolReproduceAsync(args),
                 "myclaw_note" => ToolNote(args),
                 "myclaw_read" => ToolRead(args),
+                "myclaw_recall" => await ToolRecallAsync(args),
                 "myclaw_archive" => ToolArchive(),
                 "myclaw_entity" => await ToolEntityAsync(args),
                 "myclaw_exec" => await ToolExecAsync(args),
@@ -376,6 +379,49 @@ public class McpServer : IDisposable
         var text = args["text"].ToString()!;
         _memoryStore.AppendToday(text);
         return AppendSkillHookContext("Recorded to today's log.", SkillHookType.MemoryWrite);
+    }
+
+    private async Task<string> ToolRecallAsync(Dictionary<string, object> args)
+    {
+        if (!args.TryGetValue("query", out var queryObj) || queryObj == null)
+        {
+            return "Error: query parameter required.";
+        }
+
+        var query = queryObj.ToString();
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            return "Error: query parameter required.";
+        }
+
+        var topK = 5;
+        if (args.TryGetValue("topK", out var topKObj) && topKObj != null &&
+            int.TryParse(topKObj.ToString(), out var parsedTopK) && parsedTopK > 0)
+        {
+            topK = parsedTopK;
+        }
+
+        var recall = await _memoryRecall.RecallAsync(query, topK);
+
+        if (recall.Hits.Count == 0)
+        {
+            return $"No memories matched \"{query}\" (scanned {recall.DocumentsScanned} memory file(s)).";
+        }
+
+        var mode = recall.UsedSemantic ? "semantic" : "keyword";
+        var sb = new StringBuilder();
+        sb.AppendLine($"Recall for \"{query}\" ({mode}, {recall.DocumentsScanned} file(s) scanned):");
+        sb.AppendLine();
+        var rank = 1;
+        foreach (var hit in recall.Hits)
+        {
+            sb.AppendLine($"{rank}. [{hit.Source}] (score: {hit.Score:F2})");
+            sb.AppendLine(hit.Snippet);
+            sb.AppendLine();
+            rank++;
+        }
+
+        return sb.ToString().TrimEnd();
     }
 
     private string ToolRead(Dictionary<string, object> args)
