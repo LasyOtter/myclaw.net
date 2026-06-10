@@ -27,6 +27,7 @@ class Program
             rootCommand.AddCommand(new GatewayCommand());
             rootCommand.AddCommand(new OnboardCommand());
             rootCommand.AddCommand(new StatusCommand());
+            rootCommand.AddCommand(new DoctorCommand());
             rootCommand.AddCommand(new SkillsCommand());
             rootCommand.AddCommand(new SyncTemplatesCommand());
 
@@ -48,7 +49,7 @@ class Program
         if (args.Length == 0) return false;
 
         var firstArg = args[0].ToLowerInvariant();
-        var skipCommands = new[] { "onboard", "sync-templates", "help", "--help", "-h", "--version", "-v" };
+        var skipCommands = new[] { "onboard", "sync-templates", "doctor", "help", "--help", "-h", "--version", "-v" };
         
         return skipCommands.Contains(firstArg);
     }
@@ -189,49 +190,6 @@ class Program
     /// </summary>
     private static string? FindTemplatesDirectory()
     {
-        // 1. 首先检查环境变量
-        var envTemplates = Environment.GetEnvironmentVariable("MYCLAW_TEMPLATES_DIR");
-        if (!string.IsNullOrEmpty(envTemplates) && Directory.Exists(envTemplates))
-        {
-            return envTemplates;
-        }
-
-        // 2. 从当前工作目录向上查找
-        var currentDir = Directory.GetCurrentDirectory();
-        var searchDir = currentDir;
-        
-        for (int i = 0; i < 5; i++)
-        {
-            var templatesPath = Path.Combine(searchDir, "templates");
-            if (Directory.Exists(templatesPath))
-            {
-                if (File.Exists(Path.Combine(templatesPath, "AGENTS.md")) ||
-                    File.Exists(Path.Combine(templatesPath, "SOUL.md")))
-                {
-                    return templatesPath;
-                }
-            }
-
-            var parentDir = Directory.GetParent(searchDir);
-            if (parentDir == null) break;
-            searchDir = parentDir.FullName;
-        }
-
-        // 3. 检查可执行文件所在目录
-        var exeDir = AppContext.BaseDirectory;
-        var exeTemplatesPath = Path.Combine(exeDir, "templates");
-        if (Directory.Exists(exeTemplatesPath))
-        {
-            return exeTemplatesPath;
-        }
-
-        // 4. 检查用户配置目录
-        var userTemplatesPath = Path.Combine(ConfigurationLoader.ConfigDir, "templates");
-        if (Directory.Exists(userTemplatesPath))
-        {
-            return userTemplatesPath;
-        }
-
-        return null;
+        return TemplateLocator.Find();
     }
 }
