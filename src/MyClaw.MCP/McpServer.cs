@@ -350,6 +350,7 @@ public class McpServer : IDisposable
                 "myclaw_heal" => ToolHeal(),
                 "myclaw_nociception" => await ToolNociceptionAsync(args),
                 "myclaw_briefing" => await ToolBriefingAsync(),
+                "myclaw_nudge" => ToolNudge(args),
                 _ => name.StartsWith("skill_") ? await ToolSkillAsync(name, args) : $"Unknown tool: {name}"
             };
         }
@@ -692,6 +693,17 @@ public class McpServer : IDisposable
     private async Task<string> ToolBriefingAsync()
     {
         return await _dailyBriefingService.GenerateBriefingAsync();
+    }
+
+    private string ToolNudge(Dictionary<string, object> args)
+    {
+        var recentDays = 3;
+        if (args.TryGetValue("recentDays", out var d) && int.TryParse(d?.ToString(), out var parsed))
+        {
+            recentDays = parsed;
+        }
+
+        return new MemoryNudgeService(_memoryStore).Render(recentDays);
     }
 
     private string ToolStatus()
