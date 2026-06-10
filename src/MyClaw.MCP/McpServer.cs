@@ -14,6 +14,7 @@ using MyClaw.Core.Logging;
 using MyClaw.Core.Memory;
 using MyClaw.Core.Mycelium;
 using MyClaw.Core.Ribosome;
+using MyClaw.Core.Serialization;
 using MyClaw.Skills;
 
 namespace MyClaw.MCP;
@@ -130,10 +131,7 @@ public class McpServer : IDisposable
     {
         try
         {
-            var message = JsonSerializer.Deserialize<JsonRpcRequest>(line, new JsonSerializerOptions
-            {
-                PropertyNameCaseInsensitive = true
-            });
+            var message = JsonSerializer.Deserialize<JsonRpcRequest>(line, JsonOptions.CaseInsensitiveRead);
 
             if (message == null)
             {
@@ -523,10 +521,7 @@ public class McpServer : IDisposable
 
             var manifestEntry = archive.CreateEntry("manifest.json", CompressionLevel.Optimal);
             await using var manifestStream = manifestEntry.Open();
-            await JsonSerializer.SerializeAsync(manifestStream, manifest, new JsonSerializerOptions
-            {
-                WriteIndented = true
-            });
+            await JsonSerializer.SerializeAsync(manifestStream, manifest, JsonOptions.Indented);
         }
 
         var distinctEntries = includedEntries.Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(entry => entry, StringComparer.OrdinalIgnoreCase).ToList();

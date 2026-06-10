@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text.Json;
+using MyClaw.Core.Serialization;
 
 namespace MyClaw.Core.Entities;
 
@@ -233,7 +234,7 @@ public class EntityStore
         lock (_lock)
         {
             var data = new EntityData { Entities = _entities };
-            var json = JsonSerializer.Serialize(data, new JsonSerializerOptions { WriteIndented = true });
+            var json = JsonSerializer.Serialize(data, JsonOptions.Indented);
             File.WriteAllText(_entitiesFile, json);
         }
     }

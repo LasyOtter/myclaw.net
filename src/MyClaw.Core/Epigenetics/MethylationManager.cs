@@ -1,4 +1,5 @@
 using System.Text.Json;
+using MyClaw.Core.Serialization;
 
 namespace MyClaw.Core.Epigenetics;
 
@@ -311,10 +312,7 @@ public class MethylationManager
                 };
             }
 
-            var json = JsonSerializer.Serialize(data, new JsonSerializerOptions
-            {
-                WriteIndented = true
-            });
+            var json = JsonSerializer.Serialize(data, JsonOptions.Indented);
             File.WriteAllText(_stateFilePath, json);
         }
         catch

@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.IO.Compression;
 using System.Text.Json;
+using MyClaw.Core.Serialization;
 
 namespace MyClaw.Core.VectorMemory;
 
@@ -232,12 +233,7 @@ public class PersistentVectorStore : IVectorStore, IDisposable
                     Entries = _entries.Values.ToList()
                 };
 
-                var options = new JsonSerializerOptions
-                {
-                    WriteIndented = false // 压缩格式
-                };
-
-                var json = JsonSerializer.Serialize(data, options);
+                var json = JsonSerializer.Serialize(data, JsonOptions.Compact);
 
                 // 写入临时文件
                 if (_compress)

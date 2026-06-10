@@ -7,6 +7,7 @@ using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using MyClaw.Core.Serialization;
 
 /// <summary>
 /// 核糖体修剪器 - 用进废退机制
@@ -134,10 +135,7 @@ public class RibosomePruner
         }
 
         var json = await File.ReadAllTextAsync(ribosomePath);
-        var ribosome = JsonSerializer.Deserialize<RibosomeDefinition>(json, new JsonSerializerOptions
-        {
-            PropertyNameCaseInsensitive = true
-        });
+        var ribosome = JsonSerializer.Deserialize<RibosomeDefinition>(json, JsonOptions.CaseInsensitiveRead);
 
         return ribosome ?? new RibosomeDefinition { Tools = new List<ToolDefinition>() };
     }
@@ -148,11 +146,7 @@ public class RibosomePruner
     private async Task SaveRibosomeAsync(RibosomeDefinition ribosome)
     {
         var ribosomePath = Path.Combine(_myclawDir, "RIBOSOME.json");
-        var json = JsonSerializer.Serialize(ribosome, new JsonSerializerOptions 
-        { 
-            WriteIndented = true,
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-        });
+        var json = JsonSerializer.Serialize(ribosome, JsonOptions.CamelCaseIndented);
         await File.WriteAllTextAsync(ribosomePath, json);
     }
 }

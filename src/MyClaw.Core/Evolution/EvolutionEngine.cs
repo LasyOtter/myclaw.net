@@ -5,6 +5,7 @@ using System.Text.RegularExpressions;
 using MyClaw.Core.Analytics;
 using MyClaw.Core.Epigenetics;
 using MyClaw.Core.Ribosome;
+using MyClaw.Core.Serialization;
 
 namespace MyClaw.Core.Evolution;
 
@@ -187,7 +188,7 @@ public class EvolutionEngine
                 Patterns = patterns
             };
             await File.WriteAllTextAsync(_patternsFile,
-                JsonSerializer.Serialize(patternsData, new JsonSerializerOptions { WriteIndented = true }));
+                JsonSerializer.Serialize(patternsData, JsonOptions.Indented));
         }
         catch { /* 忽略保存错误 */ }
 
@@ -670,7 +671,7 @@ public class EvolutionEngine
                 Directory.CreateDirectory(_myclawDir);
 
             await File.WriteAllTextAsync(_stateFile,
-                JsonSerializer.Serialize(state, new JsonSerializerOptions { WriteIndented = true }));
+                JsonSerializer.Serialize(state, JsonOptions.Indented));
         }
         catch { }
     }

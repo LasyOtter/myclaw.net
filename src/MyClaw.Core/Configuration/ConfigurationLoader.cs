@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Text.Json;
 using Microsoft.Extensions.Configuration;
+using MyClaw.Core.Serialization;
 
 namespace MyClaw.Core.Configuration;
 
@@ -30,11 +31,7 @@ public static class ConfigurationLoader
             try
             {
                 var json = File.ReadAllText(path);
-                var fileConfig = JsonSerializer.Deserialize<MyClawConfiguration>(json, new JsonSerializerOptions
-                {
-                    PropertyNameCaseInsensitive = true,
-                    ReadCommentHandling = JsonCommentHandling.Skip
-                });
+                var fileConfig = JsonSerializer.Deserialize<MyClawConfiguration>(json, JsonOptions.ConfigRead);
                 
                 if (fileConfig != null)
                 {
@@ -72,12 +69,7 @@ public static class ConfigurationLoader
             Directory.CreateDirectory(dir);
         }
 
-        var json = JsonSerializer.Serialize(config, new JsonSerializerOptions
-        {
-            WriteIndented = true,
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-            DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
-        });
+        var json = JsonSerializer.Serialize(config, JsonOptions.ConfigWrite);
 
         File.WriteAllText(configFile, json);
     }

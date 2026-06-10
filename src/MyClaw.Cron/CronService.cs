@@ -1,4 +1,5 @@
 using System.Text.Json;
+using MyClaw.Core.Serialization;
 using Quartz;
 using Quartz.Impl;
 
@@ -254,10 +255,7 @@ public class CronService
         try
         {
             var json = await File.ReadAllTextAsync(_storePath);
-            var jobs = JsonSerializer.Deserialize<List<CronJob>>(json, new JsonSerializerOptions
-            {
-                PropertyNameCaseInsensitive = true
-            });
+            var jobs = JsonSerializer.Deserialize<List<CronJob>>(json, JsonOptions.CaseInsensitiveRead);
 
             if (jobs != null)
             {
@@ -289,10 +287,7 @@ public class CronService
 
             lock (_lock)
             {
-                var json = JsonSerializer.Serialize(_jobs, new JsonSerializerOptions
-                {
-                    WriteIndented = true
-                });
+                var json = JsonSerializer.Serialize(_jobs, JsonOptions.Indented);
                 File.WriteAllText(_storePath, json);
             }
         }

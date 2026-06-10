@@ -10,6 +10,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using MyClaw.Core.Serialization;
 
 /// <summary>
 /// 菌丝共生网络 - 跨实例知识共享
@@ -70,7 +71,7 @@ public class MyceliumNetwork
             Timestamp = DateTime.UtcNow.ToString("o")
         };
 
-        var json = JsonSerializer.Serialize(spore, new JsonSerializerOptions { WriteIndented = true });
+        var json = JsonSerializer.Serialize(spore, JsonOptions.Indented);
         await File.WriteAllTextAsync(sporePath, json);
 
         _logger?.LogInformation("Secrete spore {Type} to {Path}", type, sporePath);
@@ -96,10 +97,7 @@ public class MyceliumNetwork
             try
             {
                 var json = await File.ReadAllTextAsync(sporePath);
-                var spore = JsonSerializer.Deserialize<Spore>(json, new JsonSerializerOptions
-                {
-                    PropertyNameCaseInsensitive = true
-                });
+                var spore = JsonSerializer.Deserialize<Spore>(json, JsonOptions.CaseInsensitiveRead);
 
                 if (spore == null)
                 {

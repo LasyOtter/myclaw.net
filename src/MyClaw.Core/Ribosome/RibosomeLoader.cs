@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using MyClaw.Core.Serialization;
 
 namespace MyClaw.Core.Ribosome;
 
@@ -128,13 +129,7 @@ public class RibosomeLoader
     {
         try
         {
-            var options = new JsonSerializerOptions
-            {
-                PropertyNameCaseInsensitive = true,
-                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-            };
-
-            var config = JsonSerializer.Deserialize<RibosomeConfig>(json, options);
+            var config = JsonSerializer.Deserialize<RibosomeConfig>(json, JsonOptions.CamelCaseCaseInsensitiveRead);
             return config;
         }
         catch
