@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using MyClaw.Core.Serialization;
 
 namespace MyClaw.Core.VectorMemory;
 
@@ -204,10 +205,7 @@ public class InMemoryVectorStore : IVectorStore
             entriesCopy = _entries.Values.ToList();
         }
 
-        var json = JsonSerializer.Serialize(entriesCopy, new JsonSerializerOptions
-        {
-            WriteIndented = true
-        });
+        var json = JsonSerializer.Serialize(entriesCopy, JsonOptions.Indented);
 
         await File.WriteAllTextAsync(path, json);
     }

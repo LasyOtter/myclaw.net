@@ -1,4 +1,5 @@
 using System.Text.Json;
+using MyClaw.Core.Serialization;
 
 namespace MyClaw.Core.Analytics;
 
@@ -65,10 +66,7 @@ public class AnalyticsService
                     Directory.CreateDirectory(dir);
                 }
 
-                var json = JsonSerializer.Serialize(_state, new JsonSerializerOptions
-                {
-                    WriteIndented = true
-                });
+                var json = JsonSerializer.Serialize(_state, JsonOptions.Indented);
                 File.WriteAllText(_stateFilePath, json);
             }
             catch

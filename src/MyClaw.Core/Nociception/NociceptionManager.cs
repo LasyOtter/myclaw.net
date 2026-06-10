@@ -1,5 +1,6 @@
 using System.Text.Json;
 using MyClaw.Core.Affect;
+using MyClaw.Core.Serialization;
 
 namespace MyClaw.Core.Nociception;
 
@@ -280,10 +281,7 @@ public class NociceptionManager
                 toSave = _painMemories.ToList();
             }
 
-            var json = JsonSerializer.Serialize(toSave, new JsonSerializerOptions
-            {
-                WriteIndented = true
-            });
+            var json = JsonSerializer.Serialize(toSave, JsonOptions.Indented);
             File.WriteAllText(_stateFilePath, json);
         }
         catch

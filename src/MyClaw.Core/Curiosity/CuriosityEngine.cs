@@ -1,5 +1,6 @@
 using System.Text.Json;
 using MyClaw.Core.Affect;
+using MyClaw.Core.Serialization;
 
 namespace MyClaw.Core.Curiosity;
 
@@ -391,7 +392,7 @@ public class CuriosityEngine
                 Targets = _targets,
                 LastGeneration = _lastGeneration
             };
-            var json = JsonSerializer.Serialize(state, new JsonSerializerOptions { WriteIndented = true });
+            var json = JsonSerializer.Serialize(state, JsonOptions.Indented);
             File.WriteAllText(_stateFilePath, json);
         }
         catch

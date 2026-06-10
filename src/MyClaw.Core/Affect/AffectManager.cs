@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using MyClaw.Core.Serialization;
 
 namespace MyClaw.Core.Affect;
 
@@ -209,10 +210,7 @@ public class AffectManager
                 Directory.CreateDirectory(directory);
             }
 
-            var json = JsonSerializer.Serialize(_currentState, new JsonSerializerOptions
-            {
-                WriteIndented = true
-            });
+            var json = JsonSerializer.Serialize(_currentState, JsonOptions.Indented);
             File.WriteAllText(_stateFilePath, json);
         }
         catch
