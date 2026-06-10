@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
 
@@ -9,9 +10,13 @@ namespace MyClaw.Core.VectorMemory;
 /// </summary>
 public class SimpleEmbeddingService : IEmbeddingService
 {
+    private const int MaxCacheSize = 10000;
+    private const int EvictionBatch = 1000;
+
     private readonly int _dimension;
     private readonly HashSet<string> _vocabulary = new();
-    private readonly Dictionary<string, float[]> _embeddingCache = new();
+    // 嵌入服务可能被多个并发请求共享（如 MCP 同时处理多条消息），缓存需线程安全。
+    private readonly ConcurrentDictionary<string, float[]> _embeddingCache = new();
 
     public int Dimension => _dimension;
 
@@ -27,9 +32,9 @@ public class SimpleEmbeddingService : IEmbeddingService
             return Task.FromResult(new float[_dimension]);
         }
 
-        // 检查缓存
-        var cacheKey = GetHashKey(text);
-        if (_embeddingCache.TryGetValue(cacheKey, out var cached))
+        // 检查缓存：直接以文本为键，避免对哈希截断 8 字节产生的碰撞（不同文本命中同一缓存项，
+        // 进而返回错误的嵌入），同时省去每次调用对全文做一次 SHA256。
+        if (_embeddingCache.TryGetValue(text, out var cached))
         {
             return Task.FromResult(cached);
         }
@@ -37,15 +42,14 @@ public class SimpleEmbeddingService : IEmbeddingService
         var embedding = ComputeEmbedding(text);
 
         // 缓存结果
-        _embeddingCache[cacheKey] = embedding;
+        _embeddingCache[text] = embedding;
 
-        // 限制缓存大小
-        if (_embeddingCache.Count > 10000)
+        // 限制缓存大小（ConcurrentDictionary 上的 TryRemove 是线程安全的）
+        if (_embeddingCache.Count > MaxCacheSize)
         {
-            var keysToRemove = _embeddingCache.Keys.Take(1000).ToList();
-            foreach (var key in keysToRemove)
+            foreach (var key in _embeddingCache.Keys.Take(EvictionBatch).ToList())
             {
-                _embeddingCache.Remove(key);
+                _embeddingCache.TryRemove(key, out _);
             }
         }
 
@@ -216,15 +220,6 @@ public class SimpleEmbeddingService : IEmbeddingService
                 vector[i] = (float)(vector[i] / magnitude);
             }
         }
-    }
-
-    /// <summary>
-    /// 获取文本的缓存键
-    /// </summary>
-    private string GetHashKey(string text)
-    {
-        var hash = ComputeHash(text);
-        return hash.ToString();
     }
 
     /// <summary>
